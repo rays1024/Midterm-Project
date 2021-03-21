@@ -669,7 +669,10 @@ Validated MAE Neural Network Regression = $4121.17
 Mean Validated MAE Neural Network Regression = $4142.28
 
 
-## Technique Rankings
+## Technique Ranking
+
+In this project, we only compare the performance of different techniques by their 5-Fold validated MAE values. We will not compare them based on time and computing cost. The following is the ranking by MAE.
+
 
 1. Square Root LASSO $3496.08
 2. Ridge $3502.27
