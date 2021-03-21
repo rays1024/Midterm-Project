@@ -1,5 +1,5 @@
 # DATA 410 Advanced Applied Machine Learning Midterm Project
-In this project, we will perform regularized regressions, Stepwise Regression, kernel regressions, Random Forest, XGBoost algorithm, and Deep Learning method in analyzing the Boston Housing Price dataset. The regularized regressions include Ridge, LASSO, Elastic Net, SCAD, and Square Root LASSO regression. The kernel regressions include Gaussian, Tricubic, Quartic, and Epanechnikov kernels. In hyperparameter tuning process, we will use the Particle Swarm Optimization where applicable. At the end, we will list the 5-Fold validated mean absolute values of the differences between predicted housing prices and the test group housing prices and compare the performance of each technique that we have applied in this project.
+In this project, we will perform regularized regressions, Stepwise Regression, kernel regressions, Random Forest, XGBoost algorithm, and Neural Networks in analyzing the Boston Housing Price dataset. The regularized regressions include Ridge, LASSO, Elastic Net, SCAD, and Square Root LASSO regression. The kernel regressions include Gaussian, Tricubic, Quartic, and Epanechnikov kernels. In hyperparameter tuning process, we will use the Particle Swarm Optimization where applicable. At the end, we will list the 5-Fold validated mean absolute values of the differences between predicted housing prices and the test group housing prices and compare the performance of each technique that we have applied in this project.
 
 ## General Imports
 These imports are the tools for regularization techniques, hyperparameter tuning, and 5-Fold validation process.
@@ -251,9 +251,9 @@ optimizer = ps.single.GlobalBestPSO(n_particles=10, dimensions=1, options=option
 
 cost, pos = optimizer.optimize(SqrtLassoCV, iters=100)
 ```
-best cost: 3.5022712055902105, best pos: [0.00682889]
+best cost: 3.496081980466119, best pos: [0.74368508]
 
-This output means that the lowest MAE is $3502.27, the best alpha value is 0.00682889.
+This output means that the lowest MAE is $3496.08, the best alpha value is 0.74368508.
 
 
 ### Smoothly Clipped Absolute Deviation (SCAD)
@@ -339,7 +339,7 @@ optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=2, options=option
 
 cost, pos = optimizer.optimize(ScadCV, iters=20)
 ```
-3.619469998140474, best pos: [1.09053869 1.94757987]
+best cost: 3.619469998140474, best pos: [1.09053869 1.94757987]
 
 This output means that the lowest MAE is $3619.47, the best lambda value is 1.09053869, and the best a value is 1.94757987.
 
@@ -495,7 +495,7 @@ def KernelGCV(tau):
   return np.array(mae_lk)
 ```
 
-Here we set the lower bound of the hyperparameter for tau value in Gaussian Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
+Here we set the lower bound of the hyperparameter for tau value in Quartic Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
 ```python
 x_max = np.array([1])
 x_min = np.array([0.001])
@@ -504,11 +504,186 @@ options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
 
 optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=1, options=options, bounds=bounds)
 
-cost, pos = optimizer.optimize(KernelGCV, iters=20)
+cost, pos = optimizer.optimize(KernelQCV, iters=20)
 ```
-best cost: 4.095809812982849, best pos: [0.07981371]
+best cost: 4.107661877712586, best pos: [0.16436064]
 
-This output means that the lowest MAE is $4095.81 and the best tau value is 0.07981371.
+This output means that the lowest MAE is $4107.66 and the best tau value is 0.16436064.
+
+### Tricubic Kernel
+We wrote a user-defined function using the "just-in-time" Numba complier to find the best hyperparameter and calculate the 5-fold validated MAE.
+```python
+@jit
+def KernelTCV(tau):
+  mae_lk = []
+  for i in range(len(tau[:,0])):
+    mae = []
+    t = tau[i,0]
+    for idxtrain, idxtest in kf.split(dat):
+      dat_test = dat[idxtest,:]
+      y_test = dat_test[np.argsort(dat_test[:, 0]),1]
+      yhat_lk = model_lowess(dat[idxtrain,:],dat[idxtest,:],Tricubic,t)
+      mae.append(mean_absolute_error(y_test, yhat_lk))
+    mae_lk.append(np.mean(mae))
+  return np.array(mae_lk)
+```
+
+Here we set the lower bound of the hyperparameter for tau value in Tricubic Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
+```python
+x_max = np.array([1])
+x_min = np.array([0.001])
+bounds = (x_min, x_max)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+
+optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=1, options=options, bounds=bounds)
+
+cost, pos = optimizer.optimize(KernelTCV, iters=20)
+```
+best cost: 4.109226106447249, best pos: [0.16764873]
+
+This output means that the lowest MAE is $4109.23 and the best tau value is 0.16764873.
+
+
+### Epanechnikov Kernel
+We wrote a user-defined function using the "just-in-time" Numba complier to find the best hyperparameter and calculate the 5-fold validated MAE.
+```python
+@jit
+def KernelECV(tau):
+  mae_lk = []
+  for i in range(len(tau[:,0])):
+    mae = []
+    t = tau[i,0]
+    for idxtrain, idxtest in kf.split(dat):
+      dat_test = dat[idxtest,:]
+      y_test = dat_test[np.argsort(dat_test[:, 0]),1]
+      yhat_lk = model_lowess(dat[idxtrain,:],dat[idxtest,:],Epanechnikov,t)
+      mae.append(mean_absolute_error(y_test, yhat_lk))
+    mae_lk.append(np.mean(mae))
+  return np.array(mae_lk)
+```
+
+Here we set the lower bound of the hyperparameter for tau value in Epanechnikov Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
+```python
+x_max = np.array([1])
+x_min = np.array([0.001])
+bounds = (x_min, x_max)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+
+optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=1, options=options, bounds=bounds)
+
+cost, pos = optimizer.optimize(KernelECV, iters=20)
+```
+best cost: 4.092768589077645, best pos: [0.16346451]
+
+This output means that the lowest MAE is $4092.77 and the best tau value is 0.16346451.
+
+## Random Forest
+
+Since the parameters for random forest regression are the number of estimators and the max depth, we will not perform hyperparameter tuning.
+```python
+rf = RandomForestRegressor(n_estimators=500,max_depth=3)
+
+mae_rf = []
+
+for idxtrain, idxtest in kf.split(dat):
+  X_train = dat[idxtrain,0]
+  y_train = dat[idxtrain,1]
+  X_test  = dat[idxtest,0]
+  y_test = dat[idxtest,1]
+  rf.fit(X_train.reshape(-1,1),y_train)
+  yhat_rf = rf.predict(X_test.reshape(-1,1))
+  mae_rf.append(mean_absolute_error(y_test, yhat_rf))
+print("Validated MAE RF = ${:,.2f}".format(1000*np.mean(mae_rf)))
+```
+Validated MAE RF = $4,203.70
+
+## XGBoost
+XGBoost is a Machine Learning algorithm based on random forest algorithm. In the boosting algorithm, decision trees alternate selection criteria that creates a dynamic selection process. In XGBoost, the algorithm uses gradient descent algorithm that minimizes error and optimizes in terms of computing resources and time. We wrote a user-defined function using the "just-in-time" Numba complier to find the best hyperparameter and calculate the 5-fold validated MAE.
+
+```python
+@jit
+def XGBCV(hparam):
+  mae_xgb = []
+  for i in prange(len(hparam[:,0])):
+    for j in prange(len(hparam[:,1])):
+      for k in prange(len(hparam[:,2])):
+        mae  = []
+        for idxtrain, idxtest in kf.split(dat):
+          X_train = dat[idxtrain,0]
+          y_train = dat[idxtrain,1]
+          X_test  = dat[idxtest,0]
+          y_test = dat[idxtest,1]
+          model_xgb = xgb.XGBRegressor(objective ='reg:squarederror',n_estimators=100,reg_lambda=i,alpha=j,gamma=k,max_depth=3)
+          model_xgb.fit(X_train.reshape(-1,1),y_train)
+          yhat_xgb = model_xgb.predict(X_test.reshape(-1,1))
+          mae.append(MAE(y_test, yhat_xgb))
+    mae_xgb.append(np.mean(mae))
+  return np.array(mae_xgb)
+```
+
+Here we set the lower bounds of the hyperparameters for lambda, alpha, and gamma values in XGBoost to be 0, and upper bounds to be 30, 5, and 20 respectively. Since we have three hyperparameters, the search dimension is 3. We used 10 particles and 20 iterations for the particle swarm optimization process.
+```python
+x_max = np.array([30,5,20])
+x_min = np.array([0,0,0])
+bounds = (x_min, x_max)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+
+optimizer = ps.single.GlobalBestPSO(n_particles=10, dimensions=3, options=options, bounds=bounds)
+
+cost, pos = optimizer.optimize(XGBCV, iters=20)
+```
+best cost: 4.285110396445116, best pos: [16.63147724  0.8438024  10.80781979]
+
+This output means that the lowest MAE is $4285.11, the best lambda value is 16.63147724, the best alpha value is 0.8438024, and the best gamma value is 10.80781979.
+
+## Neural Networks
+
+The neural networks contain many nodes or neurons. Most neural networks neurons are in layers, and neurons in each layer are connected to at least a neuron one layer before it and one layer after it. The data are passed from the neurons in the first layer to those in the last layer. All neural networks have to have an activation function. In our case, since we are performing a regression, we need a linear activation. Then we perform a 5-Fold validation process to calculate the mean absolute value.
+
+```python
+%%timeit -n 1
+
+mae_nn = []
+
+for idxtrain, idxtest in kf.split(dat):
+  X_train = dat[idxtrain,0]
+  y_train = dat[idxtrain,1]
+  X_test  = dat[idxtest,0]
+  y_test = dat[idxtest,1]
+  es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=200)
+  model.fit(X_train.reshape(-1,1),y_train,validation_split=0.3, epochs=1000, batch_size=100, verbose=0, callbacks=[es])
+  yhat_nn = model.predict(X_test.reshape(-1,1))
+  mae_nn.append(mean_absolute_error(y_test, yhat_nn))
+print("Validated MAE Neural Network Regression = ${:,.2f}".format(1000*np.mean(mae_nn)))
+```
+Validated MAE Neural Network Regression = $4183.07
+
+Validated MAE Neural Network Regression = $4180.74
+
+Validated MAE Neural Network Regression = $4114.30
+
+Validated MAE Neural Network Regression = $4112.10
+
+Validated MAE Neural Network Regression = $4121.17
+
+Mean Validated MAE Neural Network Regression = $4142.28
 
 
 ## Technique Rankings
+
+1. Square Root LASSO $3496.08
+2. Ridge $3502.27
+3. LASSO $3599.19
+4. Elastic Net $3611.12
+5. SCAD $3619.47
+6. Epanechnikov Kernel $4092.77
+7. Gaussian Kernel $4095.81
+8. Quartic Kernel $4107.66
+9. Tricubic Kernel $4109.23
+10. Neural Networks $4142.28
+11. Random Forest $4,203.70
+12. XGBoost $4285.11
+
+
+
+
