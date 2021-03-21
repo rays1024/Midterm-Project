@@ -68,7 +68,8 @@ for idxtrain, idxtest in kf.split(X):
 ```
 
 
-## Ridge Regularization
+## Regularized Regressions
+### Ridge Regularization
 The Ridge Regression is given by the following formula:
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\text{minimize}\,&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\sum\limits_{i=1}^{n}\beta_i^2" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\text{minimize}\,&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\sum\limits_{i=1}^{n}\beta_i^2" title="\text{minimize}\, \frac{1}{n}\text{SSR} + K\sum\limits_{i=1}^{n}\beta_i^2" /></a>
@@ -114,7 +115,7 @@ best cost: 3.5022712055902105, best pos: [0.00682889]
 
 This output means that the lowest MAE is $3502.27 and the best alpha value is 0.006828889.
 
-## Least Absolute Shrinkage and Selection Operator (LASSO)
+### Least Absolute Shrinkage and Selection Operator (LASSO)
 The LASSO Regression is given by the following formula:
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\text{minimize}&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\sum\limits_{i=1}^{n}|\beta_i|" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\text{minimize}&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\sum\limits_{i=1}^{n}|\beta_i|" title="\text{minimize} \frac{1}{n}\text{SSR} + K\sum\limits_{i=1}^{n}|\beta_i|" /></a>
@@ -161,7 +162,7 @@ best cost: 3.5991855957545704, best pos: [0.12359355]
 This output means that the lowest MAE is $3599.19 and the best alpha value is 0.12359355.
 
 
-## Elastic Net
+### Elastic Net
 The Elastic Net is given by the following formula:
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\text{minimize}\,&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\left(\alpha\sum\limits_{i=1}^{n}|\beta_i|&plus;(1-\alpha)\sum\limits_{i=1}^{n}\beta_i^2\right)" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\text{minimize}\,&space;\frac{1}{n}\text{SSR}&space;&plus;&space;K\left(\alpha\sum\limits_{i=1}^{n}|\beta_i|&plus;(1-\alpha)\sum\limits_{i=1}^{n}\beta_i^2\right)" title="\text{minimize}\, \frac{1}{n}\text{SSR} + K\left(\alpha\sum\limits_{i=1}^{n}|\beta_i|+(1-\alpha)\sum\limits_{i=1}^{n}\beta_i^2\right)" /></a>
@@ -210,7 +211,7 @@ best cost: 3.6111177463331705, best pos: [0.05282937 0.76712692]
 This output means that the lowest MAE is $3611.12, the best alpha value is 0.05282937, and the best L1 weight is 0.76712692.
 
 
-## Square Root LASSO
+### Square Root LASSO
 The Square Root LASSO is given by the following formula:
 
 <a href="https://www.codecogs.com/eqnedit.php?latex=\displaystyle\text{minimize}&space;\sqrt{\frac{1}{n}\sum\limits_{i=1}^{n}(y_i-\hat{y}_i)^2}&space;&plus;\alpha\sum\limits_{i=1}^{p}|\beta_i|" target="_blank"><img src="https://latex.codecogs.com/gif.latex?\displaystyle\text{minimize}&space;\sqrt{\frac{1}{n}\sum\limits_{i=1}^{n}(y_i-\hat{y}_i)^2}&space;&plus;\alpha\sum\limits_{i=1}^{p}|\beta_i|" title="\displaystyle\text{minimize} \sqrt{\frac{1}{n}\sum\limits_{i=1}^{n}(y_i-\hat{y}_i)^2} +\alpha\sum\limits_{i=1}^{p}|\beta_i|" /></a>
@@ -255,7 +256,7 @@ best cost: 3.5022712055902105, best pos: [0.00682889]
 This output means that the lowest MAE is $3502.27, the best alpha value is 0.00682889.
 
 
-## Smoothly Clipped Absolute Deviation (SCAD)
+### Smoothly Clipped Absolute Deviation (SCAD)
 The SCAD was introduced by Fan and Li to make penalties for large values of betas constant and not penalize more as beta values increase. A part of codes we used was from https://andrewcharlesjones.github.io/posts/2020/03/scad/. 
 ```python
 @jit
@@ -342,7 +343,172 @@ cost, pos = optimizer.optimize(ScadCV, iters=20)
 
 This output means that the lowest MAE is $3619.47, the best lambda value is 1.09053869, and the best a value is 1.94757987.
 
+## Stepwise Regression
+In the Stepwise regression, we focus on the independent variables and their significance and influence on the dependent variable. Here, we wrote a user-defined function to find the significant variables in the dataset.
 
+```python
+# Implementation of stepwise regression
+def stepwise_selection(X, y, 
+                       initial_list=[], 
+                       threshold_in=0.01, 
+                       threshold_out = 0.05, 
+                       verbose=True):
+    
+    included = list(initial_list)
+    while True:
+        changed=False
+        excluded = list(set(X.columns)-set(included))
+        new_pval = pd.Series(index=excluded)
+        for new_column in excluded:
+            model = sm.OLS(y, sm.add_constant(pd.DataFrame(X[included+[new_column]]))).fit()
+            new_pval[new_column] = model.pvalues[new_column]
+        best_pval = new_pval.min()
+        if best_pval < threshold_in:
+            best_feature = new_pval.idxmin()
+            included.append(best_feature)
+            changed=True
+            if verbose:
+                print('Add  {:30} with p-value {:.6}'.format(best_feature, best_pval))
+
+        model = sm.OLS(y, sm.add_constant(pd.DataFrame(X[included]))).fit()
+        pvalues = model.pvalues.iloc[1:]
+        worst_pval = pvalues.max() 
+        if worst_pval > threshold_out:
+            changed=True
+            worst_feature = pvalues.idxmax()
+            included.remove(worst_feature)
+            if verbose:
+                print('Drop {:30} with p-value {:.6}'.format(worst_feature, worst_pval))
+        if not changed:
+            break
+    return included
+```
+```python
+stepwise_selection(Xdf,y)
+/usr/local/lib/python3.7/dist-packages/ipykernel_launcher.py:12: DeprecationWarning: The default dtype for empty Series will be 'object' instead of 'float64' in a future version. Specify a dtype explicitly to silence this warning.
+  if sys.path[0] == '':
+Add  lstat                          with p-value 3.73151e-89
+Add  rooms                          with p-value 3.03097e-27
+Add  ptratio                        with p-value 3.43631e-14
+Add  distance                       with p-value 9.7351e-06
+Add  nox                            with p-value 2.78245e-08
+['lstat', 'rooms', 'ptratio', 'distance', 'nox']
+```
+The Stepwise Regression returns the lstat, rooms, ptratio, distance, and nox variables to be significant in predicting the dependent variable.
+  
+
+
+## Kernel Regressions
+The kernel weighted local regression estimates the function locally as its name indicates. There are no parameters that define a function in kernel regression. For each x value, the algorithm generates an estimation for y using the individual x's neighboring values. The number of neighbors, k, determines the variance and bias of the estimation. Higher value of k yields low variance and high bias, and vice versa. We can use different kernel functions for assigning weights based on the Euclidean distance between the x value and its neighbors. In this project, we will perform four kernel regressions with different kernels.
+
+### General Functions
+```python
+def Tricubic(x):
+  return np.where(np.abs(x)>1,0,70/81*(1-np.abs(x)**3)**3)
+
+def Epanechnikov(x):
+  return np.where(np.abs(x)>1,0,3/4*(1-np.abs(x)**2)) 
+
+def Quartic(x):
+  return np.where(np.abs(x)>1,0,15/16*(1-np.abs(x)**2)**2)
+
+def Gaussian(x):
+  return np.where(np.abs(x)>2,0,np.exp(-1/2*x**2))
+```
+```python
+
+def lowess_kern(x, y, kern, tau):
+
+    n = len(x)
+    yest = np.zeros(n)
+
+    w = np.array([kern((x - x[i])/(2*tau)) for i in range(n)])     
+    
+    for i in range(n):
+        weights = w[:, i]
+        b = np.array([np.sum(weights * y), np.sum(weights * y * x)])
+        A = np.array([[np.sum(weights), np.sum(weights * x)],
+                    [np.sum(weights * x), np.sum(weights * x * x)]])
+        theta, res, rnk, s = linalg.lstsq(A, b)
+        yest[i] = theta[0] + theta[1] * x[i] 
+
+    return yest
+
+def model_lowess(dat_train,dat_test,kern,tau):
+  dat_train = dat_train[np.argsort(dat_train[:, 0])]
+  dat_test = dat_test[np.argsort(dat_test[:, 0])]
+  Yhat_lowess = lowess_kern(dat_train[:,0],dat_train[:,1],kern,tau)
+  datl = np.concatenate([dat_train[:,0].reshape(-1,1),Yhat_lowess.reshape(-1,1)], axis=1)
+  f = interp1d(datl[:,0], datl[:,1],fill_value='extrapolate')
+  return f(dat_test[:,0])
+```
+### Gaussian Kernel
+
+We wrote a user-defined function using the "just-in-time" Numba complier to find the best hyperparameter and calculate the 5-fold validated MAE.
+```python
+@jit
+def KernelGCV(tau):
+  mae_lk = []
+  for i in range(len(tau[:,0])):
+    mae = []
+    t = tau[i,0]
+    for idxtrain, idxtest in kf.split(dat):
+      dat_test = dat[idxtest,:]
+      y_test = dat_test[np.argsort(dat_test[:, 0]),1]
+      yhat_lk = model_lowess(dat[idxtrain,:],dat[idxtest,:],Gaussian,t)
+      mae.append(mean_absolute_error(y_test, yhat_lk))
+    mae_lk.append(np.mean(mae))
+  return np.array(mae_lk)
+```
+
+Here we set the lower bound of the hyperparameter for tau value in Gaussian Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
+```python
+x_max = np.array([1])
+x_min = np.array([0.001])
+bounds = (x_min, x_max)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+
+optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=1, options=options, bounds=bounds)
+
+cost, pos = optimizer.optimize(KernelGCV, iters=20)
+```
+best cost: 4.095809812982849, best pos: [0.07981371]
+
+This output means that the lowest MAE is $4095.81 and the best tau value is 0.07981371.
+
+
+### Quartic Kernel
+We wrote a user-defined function using the "just-in-time" Numba complier to find the best hyperparameter and calculate the 5-fold validated MAE.
+```python
+@jit
+def KernelGCV(tau):
+  mae_lk = []
+  for i in range(len(tau[:,0])):
+    mae = []
+    t = tau[i,0]
+    for idxtrain, idxtest in kf.split(dat):
+      dat_test = dat[idxtest,:]
+      y_test = dat_test[np.argsort(dat_test[:, 0]),1]
+      yhat_lk = model_lowess(dat[idxtrain,:],dat[idxtest,:],Gaussian,t)
+      mae.append(mean_absolute_error(y_test, yhat_lk))
+    mae_lk.append(np.mean(mae))
+  return np.array(mae_lk)
+```
+
+Here we set the lower bound of the hyperparameter for tau value in Gaussian Kernel Regression to be 0.001 and upper bound to be 1. We used 20 particles and 20 iterations for the particle swarm optimization process.
+```python
+x_max = np.array([1])
+x_min = np.array([0.001])
+bounds = (x_min, x_max)
+options = {'c1': 0.5, 'c2': 0.3, 'w': 0.9}
+
+optimizer = ps.single.GlobalBestPSO(n_particles=20, dimensions=1, options=options, bounds=bounds)
+
+cost, pos = optimizer.optimize(KernelGCV, iters=20)
+```
+best cost: 4.095809812982849, best pos: [0.07981371]
+
+This output means that the lowest MAE is $4095.81 and the best tau value is 0.07981371.
 
 
 ## Technique Rankings
